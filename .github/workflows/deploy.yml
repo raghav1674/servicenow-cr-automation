@@ -1,0 +1,32 @@
+name: Deploy with ServiceNow
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create:
+    uses: ./.github/workflows/servicenow.yml
+    with:
+      action: create
+      instance: dev198952.service-now.com
+      hmac_token: ${{ secrets.SNOW_HMAC }}
+      body: '{"short_description":"Deploy release 1.2.3","type": "Normal"}'
+
+  wait:
+    needs: create
+    uses: ./.github/workflows/servicenow.yml
+    with:
+      action: wait
+      instance: dev198952.service-now.com
+      hmac_token: ${{ secrets.SNOW_HMAC }}
+      cr_id: ${{ needs.create.outputs.cr_id }}
+      timeout_minutes: 30
+
+  close:
+    needs: wait
+    uses: ./.github/workflows/servicenow.yml
+    with:
+      action: close
+      instance: dev198952.service-now.com
+      hmac_token: ${{ secrets.SNOW_HMAC }}
+      cr_id: ${{ needs.create.outputs.cr_id }}
