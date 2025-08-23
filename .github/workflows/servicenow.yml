@@ -30,35 +30,12 @@ jobs:
       cr_id: ${{ steps.run.outputs.cr_id }}
     steps:
       - uses: actions/checkout@v4
-      - id: run
-        run: |
-          ./scripts/servicenow.sh \
-            -a create \
-            -i "${{ inputs.instance }}" \
-            -t "${{ secrets.hmac_token }}" \
-            -b '${{ inputs.body }}'
-
-  wait-cr:
-    if: ${{ inputs.action == 'wait' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
       - run: |
+          chmod +x ./scripts/servicenow.sh
           ./scripts/servicenow.sh \
-            -a wait \
+            -a "${{ inputs.action }}" \
             -i "${{ inputs.instance }}" \
             -t "${{ secrets.hmac_token }}" \
-            -c "${{ inputs.cr_id }}" \
-            -m "${{ inputs.timeout_minutes || '' }}"
-
-  close-cr:
-    if: ${{ inputs.action == 'close' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: |
-          ./scripts/servicenow.sh \
-            -a close \
-            -i "${{ inputs.instance }}" \
-            -t "${{ secrets.hmac_token }}" \
-            -c "${{ inputs.cr_id }}"
+            ${ inputs.body && format('-b \'{0}\'', inputs.body) || '' } \
+            ${ inputs.cr_id && format('-c {0}', inputs.cr_id) || '' } \
+            ${ inputs.timeout_minutes && format('-m {0}', inputs.timeout_minutes) || '' }
