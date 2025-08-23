@@ -5,28 +5,31 @@ on:
 
 jobs:
   create:
-    uses: ./.github/actions/servicenow/actions.yml
+    uses: ./.github/actions/servicenow/action.yml
+    secrets:
+      hmac_token: ${{ secrets.SNOW_HMAC }}
     with:
       action: create
       instance: dev198952.service-now.com
-      hmac_token: ${{ secrets.SNOW_HMAC }}
       body: '{"short_description":"Deploy release 1.2.3","type": "Normal"}'
 
   wait:
     needs: create
-    uses: ./.github/actions/servicenow/actions.yml
+    uses: ./.github/actions/servicenow/action.yml
+    secrets:
+      hmac_token: ${{ secrets.SNOW_HMAC }}
     with:
       action: wait
       instance: dev198952.service-now.com
-      hmac_token: ${{ secrets.SNOW_HMAC }}
       cr_id: ${{ needs.create.outputs.cr_id }}
       timeout_minutes: 30
 
   close:
     needs: wait
-    uses: ./.github/actions/servicenow/actions.yml
+    uses: ./.github/actions/servicenow/action.yml
+    secrets:
+      hmac_token: ${{ secrets.SNOW_HMAC }}
     with:
       action: close
       instance: dev198952.service-now.com
-      hmac_token: ${{ secrets.SNOW_HMAC }}
       cr_id: ${{ needs.create.outputs.cr_id }}
