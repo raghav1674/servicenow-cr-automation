@@ -5,7 +5,7 @@ on:
 
 jobs:
   create:
-    uses: raghav1674/servicenow-cr-automation/.github/actions/servicenow/action.yml@main
+    uses: raghav1674/servicenow-cr-automation/.github/workflows/servicenow/action.yml@main
     secrets:
       hmac_token: ${{ secrets.SNOW_HMAC }}
     with:
@@ -15,7 +15,7 @@ jobs:
 
   wait:
     needs: create
-    uses: raghav1674/servicenow-cr-automation/.github/actions/servicenow/action.yml@main
+    uses: raghav1674/servicenow-cr-automation/.github/workflows/servicenow/action.yml@main
     secrets:
       hmac_token: ${{ secrets.SNOW_HMAC }}
     with:
@@ -26,7 +26,7 @@ jobs:
 
   close:
     needs: wait
-    uses: raghav1674/servicenow-cr-automation/.github/actions/servicenow/action.yml@main
+    uses: raghav1674/servicenow-cr-automation/.github/workflows/servicenow/action.yml@main
     secrets:
       hmac_token: ${{ secrets.SNOW_HMAC }}
     with:
