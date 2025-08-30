@@ -2,10 +2,19 @@ name: Deploy with ServiceNow
 
 on:
   workflow_dispatch:
+    inputs:
+      env:
+        description: "Environment (dev, qa, prod)"
+        required: true
+        default: "dev"
+
+env:
+  ENV: ${{ inputs.env }}
 
 jobs:
   create:
-    uses: ./.github/workflows/servicenow.yml
+    if: ${{ inputs.ENV != 'dev' }}
+    uses: ./.github/workflows/servicenow-simple.yml
     secrets:
       hmac_token: ${{ secrets.SNOW_HMAC }}
     with:
@@ -14,22 +23,24 @@ jobs:
       body: '{"short_description":"Deploy release 1.2.3","type": "Normal"}'
 
   wait:
+    if: ${{ inputs.ENV != 'dev' }}
     needs: create
-    uses: ./.github/workflows/servicenow.yml
+    uses: ./.github/workflows/servicenow-simple.yml
     secrets:
       hmac_token: ${{ secrets.SNOW_HMAC }}
     with:
       action: wait
       instance: dev198952.service-now.com
-      cr_id: ${{ needs.create.outputs.cr_id }}
+      cr_sys_id: ${{ needs.create.outputs.cr_sys_identifier }}
       timeout_minutes: 30
 
   close:
-    needs: wait
-    uses: ./.github/workflows/servicenow.yml
+    if: ${{ inputs.ENV != 'dev' }}
+    needs: [wait,create]
+    uses: ./.github/workflows/servicenow-simple.yml
     secrets:
       hmac_token: ${{ secrets.SNOW_HMAC }}
     with:
       action: close
       instance: dev198952.service-now.com
-      cr_id: ${{ needs.create.outputs.cr_id }}
+      cr_sys_id: ${{ needs.create.outputs.cr_sys_identifier }}

@@ -83,7 +83,7 @@ create_cr() {
   log "INFO" "Creating Change Request"
   response=$(call_api "POST" "$API_URL" "$BODY") || error_exit "Failed to call API"
 
-  cr_id=$(echo "$response" | jq -r '.result.number // empty')
+  cr_id=$(echo "$response" | jq -r '.result.number.value // empty')
   [[ -z "$cr_id" ]] && error_exit "Failed to parse CR ID from response"
 
   log "INFO" "Created CR: $cr_id"

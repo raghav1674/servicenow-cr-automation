@@ -1,0 +1,110 @@
+name: ServiceNow Operations
+
+on:
+  workflow_call:
+    inputs:
+      action:
+        description: "Action to perform (create|wait|close)"
+        required: true
+        type: string
+      instance:
+        description: "ServiceNow instance (e.g., dev198952.service-now.com)"
+        required: true
+        type: string
+      body:
+        description: "Body payload for create CR (JSON)"
+        required: false
+        type: string
+      cr_sys_id:
+        description: "Change request SYS ID (for wait/close)"
+        required: false
+        type: string
+      timeout_minutes:
+        description: "Timeout for waiting on approval"
+        required: false
+        default: "30"
+        type: string
+    secrets:
+      hmac_token:
+        required: true
+
+    outputs:
+      cr_sys_identifier:
+        description: "Change request SYS ID"
+        value: ${{ jobs.create.outputs.cr_sys_id }}
+      cr_number:
+        description: "Change request ID"
+        value: ${{ jobs.create.outputs.cr_id }}
+
+
+jobs:
+  create:
+    if: ${{ inputs.action == 'create' }}
+    runs-on: ubuntu-latest
+    outputs:
+      cr_id: ${{ steps.extract.outputs.cr_id }}
+      cr_sys_id: ${{ steps.extract.outputs.cr_sys_id }}
+    steps:
+      - name: Create Change Request
+        id: create
+        run: |
+          response=$(curl -s -X POST "https://${{ inputs.instance }}/api/sn_chg_rest/change" \
+            -H "Content-Type: application/json" \
+            -H "x-sn-hmac-signature-256: ${{ secrets.hmac_token }}" \
+            -d '${{ inputs.body }}')
+          echo "$response" > response.json
+          cat response.json
+
+      - name: Extract CR ID
+        id: extract
+        run: |
+          cr_id=$(jq -r '.result.number.value' response.json)
+          cr_sys_id=$(jq -r '.result.sys_id.value' response.json)
+          echo "cr_id=$cr_id" >> $GITHUB_OUTPUT
+          echo "cr_sys_id=$cr_sys_id" >> $GITHUB_OUTPUT
+          echo "Created CR ID: $cr_id"
+          echo "Created CR SYS ID: $cr_sys_id"
+
+  wait:
+    if: ${{ inputs.action == 'wait' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for CR Approval
+        run: |
+          start=$(date +%s)
+          while true; do
+            response=$(curl -s "https://${{ inputs.instance }}/api/sn_chg_rest/change/${{ inputs.cr_sys_id }}" \
+              -H "x-sn-hmac-signature-256: ${{ secrets.hmac_token }}")
+            state=$(echo "$response" | jq -r '.result.state.display_value')
+            echo "Current state: $state"
+            if [[ "$state" == "Implement" ]]; then
+              echo "CR approved!"
+              break
+            elif [[ "$state" == "Canceled" ]]; then
+              echo "CR rejected!"
+              exit 1
+            fi
+            now=$(date +%s)
+            elapsed=$(( (now - start) / 60 ))
+            if [[ $elapsed -ge ${{ inputs.timeout_minutes }} ]]; then
+              echo "Timeout waiting for CR approval"
+              exit 1
+            fi
+            sleep 30
+          done
+
+  close:
+    if: ${{ inputs.action == 'close' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close Change Request
+        run: |
+          curl -s -X PATCH "https://${{ inputs.instance }}/api/sn_chg_rest/change/${{ inputs.cr_sys_id }}" \
+            -H "Content-Type: application/json" \
+            -H "x-sn-hmac-signature-256: ${{ secrets.hmac_token }}" \
+            -d '{"state":"Review"}'
+          curl -s -X PATCH "https://${{ inputs.instance }}/api/sn_chg_rest/change/${{ inputs.cr_sys_id }}" \
+            -H "Content-Type: application/json" \
+            -H "x-sn-hmac-signature-256: ${{ secrets.hmac_token }}" \
+            -d '{"state":"Closed"}'
+          echo "Closed CR ${{ inputs.cr_sys_id }}"
